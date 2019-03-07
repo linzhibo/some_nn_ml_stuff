@@ -11,9 +11,8 @@ from sklearn.model_selection import GridSearchCV
 
 img_width, img_height = 28, 28
 
-def hyperParameterTuning():
+def getTrainData():
     train_data_dir = 'train'
-    validation_data_dir = 'validation'
     train_data = sorted(os.listdir(train_data_dir))
     x_train = []
     y_train = np.array([])
@@ -24,27 +23,48 @@ def hyperParameterTuning():
         y_train = np.concatenate((y_train,np.array([int(folder)]*len(os.listdir(folder_path)))))
         for sample in os.listdir(folder_path):
             img_path = os.path.join(folder_path, sample)
-            x = cv2.imread(img_path,0)
-            # cv2.imshow('frame',x)
-            # if cv2.waitKey(0) & 0xFF == ord('q'):
-            #     cv2.destroyAllWindows()
-            #     sys.exit(1)
-            # x = image.load_img(img_path,color_mode='grayscale',target_size=(img_width,img_height))
-            
+            x = cv2.imread(img_path,0)     
             x = cv2.resize(x,(img_width,img_height))
             _, thresh = cv2.threshold(x,127,255,cv2.THRESH_BINARY )
             thresh = thresh.reshape(img_width*img_height,)
             x_train.append(thresh) 
 
     x_train = np.array(x_train)/255.
-    
+    return x_train, y_train
+
+def getValidationData():
+    validation_data_dir = 'validation'
+    test_data = sorted(os.listdir(validation_data_dir))
+    x_test = []
+    y_test = np.array([])
+
+    for folder in test_data:
+        print ('loading data from folder :'  + ' '+ folder)
+        folder_path = os.path.join(validation_data_dir, folder)
+        y_test = np.concatenate((y_test,np.array([int(folder)]*len(os.listdir(folder_path)))))
+        for sample in os.listdir(folder_path):
+            img_path = os.path.join(folder_path, sample)
+            x = cv2.imread(img_path,0)           
+            x = cv2.resize(x,(img_width,img_height))
+            _, thresh = cv2.threshold(x,127,255,cv2.THRESH_BINARY )
+            thresh = thresh.reshape(img_width*img_height,)
+            x_test.append(thresh) 
+
+    x_test = np.array(x_test)/255.
+
+    return x_test, y_test
+
+
+def hyperParameterTuning():
+    x_train, y_train = getTrainData()
     mlp = MLPClassifier(max_iter=100)
     parameter_space = {
-    'hidden_layer_sizes': [(50,50,50), (50,100,50), (100,)],
-    'activation': ['tanh', 'relu'],
-    'solver': ['sgd', 'adam'],
-    'alpha': [0.0001, 0.05],
-    'learning_rate': ['constant','adaptive']}
+    'hidden_layer_sizes': [(100,100),(7,),(10,10)],
+    'activation': ['relu'],
+    'solver': ['lbfgs','sgd', 'adam'],
+    'alpha': [0.0001],
+    'learning_rate': ['constant','adaptive'],
+    'verbose':[True]}
 
     print ('begin training ...')
     
@@ -56,54 +76,35 @@ def hyperParameterTuning():
     for mean, std, params in zip(means, stds, clf.cv_results_['params']):
         print("%0.3f (+/-%0.03f) for %r" % (mean, std * 2, params))
 
-
-def skModel():
-    train_data_dir = 'train'
-    validation_data_dir = 'validation'
-    train_data = sorted(os.listdir(train_data_dir))
-    x_train = []
-    y_train = np.array([])
-
-    for folder in train_data:
-        print ('loading data from folder :'  + ' '+ folder)
-        folder_path = os.path.join(train_data_dir, folder)
-        y_train = np.concatenate((y_train,np.array([int(folder)]*len(os.listdir(folder_path)))))
-        for sample in os.listdir(folder_path):
-            img_path = os.path.join(folder_path, sample)
-            x = cv2.imread(img_path,0)
-            # cv2.imshow('frame',x)
-            # if cv2.waitKey(0) & 0xFF == ord('q'):
-            #     cv2.destroyAllWindows()
-            #     sys.exit(1)
-            # x = image.load_img(img_path,color_mode='grayscale',target_size=(img_width,img_height))
-            
-            x = cv2.resize(x,(img_width,img_height))
-            _, thresh = cv2.threshold(x,127,255,cv2.THRESH_BINARY )
-            thresh = thresh.reshape(img_width*img_height,)
-            x_train.append(thresh) 
-
-    x_train = np.array(x_train)/255.
+def trainModel():
+    x_train, y_train = getTrainData()
     print ('begin training ...')
 
     clf = mlp = MLPClassifier(hidden_layer_sizes=(100,100), 
                               activation='relu',
                               max_iter=200, 
-                              alpha=1e-4,
-                              solver='sgd', 
+                              alpha=0.0001,
+                              solver='adam', 
                               verbose=10, 
                               tol=1e-4, 
-                              random_state=1,
-                              learning_rate_init=.1)
+                            #   random_state=1,
+                              learning_rate='constant')
     clf.fit(x_train, y_train)
     filename = 'finalized_model.sav'
     pickle.dump(clf, open(filename, 'wb'))
+
+def validationTest():
+    load_model = pickle.load(open('finalized_model.sav', 'rb'))
+    x_validation, y_validation = getValidationData()
+    result = load_model.score(x_validation, y_validation)
+    print result
+
 
 def put_label(t_img,label,x,y):
     font = cv2.FONT_HERSHEY_SIMPLEX
     l_x = int(x) - 10
     l_y = int(y) + 10
-    # cv2.rectangle(t_img,(l_x,l_y+5),(l_x+35,l_y-35),(0,255,0),-1) 
-    cv2.putText(t_img,str(label),(l_x,l_y), font,1.5,(255,0,0),1,cv2.LINE_AA)
+    cv2.putText(t_img,str(label),(l_x,l_y), font,1.5,(255,0,0),2,cv2.LINE_AA)
     return t_img
 
 def image_refiner(gray):
@@ -149,35 +150,14 @@ def getBoxedImg(img, load_model):
             pred =  int(load_model.predict(roi)[0])
             (x,y),radius = cv2.minEnclosingCircle(c)
             img = put_label(img,pred,x,y)
-    # return cv2.resize(img.copy(), (height,width))
     return img
 
 # @profile
-def fitSKModel():   
-    load_model = pickle.load(open('v1.sav', 'rb'))
-    #img 9
-    img = cv2.imread('/home/zlin/Desktop/Untitled Folder/7.png')
-    crop = img[578:635,363:387]
+def imgTest():   
+    load_model = pickle.load(open('finalized_model.sav', 'rb'))
 
-    # img 6
-    # img = cv2.imread('/home/zlin/Desktop/Untitled Folder/6.png')
-    # crop = img[574:632,370:392]
-
-    # #img 5
-    # img = cv2.imread('/home/zlin/Desktop/Untitled Folder/5.png')
-    # crop = img[578:635,377:401]
-
-    #img 4
-    # img = cv2.imread('/home/zlin/Desktop/Untitled Folder/4.png')
-    # crop = img[578:635,384:407]
-
-    #img 3
-    # img = cv2.imread('/home/zlin/Desktop/Untitled Folder/2.png')
-    # crop = img[578:635,389:413]
-
-    #img 1
-    # img = cv2.imread('/home/zlin/Desktop/Untitled Folder/1.png')
-    # crop = img[578:635,395:418]
+    img = cv2.imread('../test_pics/1.png')
+    crop = img[578:635,395:418]
 
     src = getBoxedImg(crop, load_model)  
     img[100:src.shape[0]+100,0:src.shape[1]] = src
@@ -185,7 +165,8 @@ def fitSKModel():
     if cv2.waitKey(0) & 0xFF == ord('q'):
         cv2.destroyAllWindows()
 
-# fitSKModel()
 
-# skModel()
-hyperParameterTuning()
+# hyperParameterTuning()
+trainModel()
+validationTest()
+imgTest()
