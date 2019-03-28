@@ -29,5 +29,5 @@ One could find running the keras model is too much **memory consuming**, there a
 
 ![](readme_pics/hyperParametersTuning.png)
 
-![](readme_pics/lane_boundaries_extract_1.gif)
+![](readme_pics/lane_boundaries_extract_3.gif)
 > deeplab segmentation mask, lane boundaries extraction, ransac to eliminate outliers, cv draw line
