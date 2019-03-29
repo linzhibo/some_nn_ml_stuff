@@ -14,20 +14,20 @@ python sklearn_model.py
 
 *Traffic light detection with Yolov3, then process direction, color and digits with trained model*
 
-![alt text](https://github.com/linzhibo/some_nn_ml_stuff/blob/master/readme_pics/genData.png "this is image zero")
+![alt text](readme_pics/genData.png "this is image zero")
 
-![alt text](https://github.com/linzhibo/some_nn_ml_stuff/blob/master/readme_pics/digit_recog_2.png "this is image un")
+![alt text](readme_pics/digit_recog_2.png "this is image un")
 
-![alt text](https://github.com/linzhibo/some_nn_ml_stuff/blob/master/readme_pics/detect_2.png "this is image deux")
+![alt text](readme_pics/detect_2.png "this is image deux")
 
 # some comparison between keras and sklearn model profile:
-![alt text](https://github.com/linzhibo/some_nn_ml_stuff/blob/master/readme_pics/profile_keras.png "this is image trois")
+![alt text](readme_pics/profile_keras.png "this is image trois")
 
-![alt text](https://github.com/linzhibo/some_nn_ml_stuff/blob/master/readme_pics/profile_sklearn.png "this is image quatre")
+![alt text](readme_pics/profile_sklearn.png "this is image quatre")
 
 One could find running the keras model is too much **memory consuming**, there are other methods to tune the tf backend, here is an example using scikit-learn.
 
-![](readme_pics/hyperParametersTuning.png)
+[hyperParametersTuning.png](readme_pics/hyperParametersTuning.png)
 
 ![](readme_pics/lane_boundaries_extract_3.gif)
 > deeplab segmentation mask, lane boundaries extraction, ransac to eliminate outliers, cv draw line

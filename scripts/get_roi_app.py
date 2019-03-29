@@ -35,7 +35,13 @@ class getRoiApp(object):
         self.video_timer = 0
         self.progress = 0
         self.total_time = 0
+        self.total_frame = 0
         self.color = (255,255,255)
+        self.timeLinePos = 0
+        self.timeLineModified = 0
+        self.videoCap = 0
+        self.img = 0
+        self.timeLineLength = 1000
         
 
     def nothing(self, x):
@@ -64,13 +70,23 @@ class getRoiApp(object):
             self.dragging = False
         cv2.setTrackbarPos('horizontal', 'img', self.horizontal)
         cv2.setTrackbarPos('vertical', 'img', self.vertical)
+    
+    def setTimeLine(self, x):
+        pos = int(x*self.total_frame/self.timeLineLength)
+        self.videoCap.set(cv2.CAP_PROP_POS_FRAMES, pos)
+        ret, self.img = self.videoCap.read()
+        if ret == True:
+            self.img = cv2.resize(self.img, (1280,720))
+            self.updateStatus()
+            
 
     def initWindow(self):
         cv2.namedWindow("img")
         cv2.moveWindow("img", 300,200)
-        cv2.createTrackbar('horizontal','img',0 ,self.width-self.roi_size, self.nothing)
-        cv2.createTrackbar('vertical','img',0 ,self.height-self.roi_size, self.nothing)
-        cv2.createTrackbar('material', 'img',0,5, self.nothing)
+        cv2.createTrackbar('horizontal','img', 0,self.width-self.roi_size, self.nothing)
+        cv2.createTrackbar('vertical','img', 0,self.height-self.roi_size, self.nothing)
+        cv2.createTrackbar('timeline','img', 0, self.timeLineLength, self.setTimeLine)
+        cv2.createTrackbar('material', 'img', 0, 5, self.nothing)
     
     def checkArrowKeys(self, k):
         # 81 left, 82 up, 83 right, 84 down
@@ -78,7 +94,7 @@ class getRoiApp(object):
         if k == 81:
             cv2.setTrackbarPos('horizontal', 'img', self.horizontal - move_pixel)
         if k == 83:
-            cv2.setTrackbarPos('horizontal', 'img',  self.horizontal + move_pixel)
+            cv2.setTrackbarPos('horizontal', 'img', self.horizontal + move_pixel)
         if k == 82:
             cv2.setTrackbarPos('vertical', 'img', self.vertical - move_pixel)
         if k == 84:
@@ -93,18 +109,17 @@ class getRoiApp(object):
                 self.roi_size -= 10
             
 
-    def showMainWindow(self, img):
+    def showMainWindow(self):
         cv2.setMouseCallback("img", self.mouseDragging)
         while(1):
-            
-            src  = img.copy()
+            src  = self.img.copy()
             self.vertical = cv2.getTrackbarPos('vertical', 'img')
             self.horizontal = cv2.getTrackbarPos('horizontal', 'img')
             material = self.materials[cv2.getTrackbarPos('material', 'img')]
             cv2.putText(src, material, (self.roi_size+self.horizontal,self.vertical+self.roi_size/2), cv2.FONT_HERSHEY_SIMPLEX, 2.0, (255, 255, 255), lineType=cv2.LINE_AA)
             cv2.putText(src, 'progress: ' + str('%.3f'%self.progress)+ ' %', (20,40), cv2.FONT_HERSHEY_SIMPLEX, 0.5, self.color, lineType=cv2.LINE_AA)
             cv2.putText(src, 'time: ' + self.video_timer +' /' + self.total_time, (20,60), cv2.FONT_HERSHEY_SIMPLEX, 0.5, self.color, lineType=cv2.LINE_AA)
-            road_roi = img[self.vertical: self.roi_size+self.vertical, self.horizontal: self.roi_size+self.horizontal]
+            road_roi = self.img[self.vertical: self.roi_size+self.vertical, self.horizontal: self.roi_size+self.horizontal]
             cv2.rectangle(src, (self.horizontal,self.vertical),(self.roi_size+self.horizontal,self.roi_size+self.vertical), (0,255,0),2)
             cv2.imshow("img", src)
             f_name = material+'/'+str(self.current_time)+'_'+str(self.count) + '.png'
@@ -146,36 +161,40 @@ class getRoiApp(object):
                 self.skip = 1
                 return
 
+    def updateStatus(self):
+        crop = self.img[0:100,0:100]
+        # print np.mean(cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY))
+        if np.mean(cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)) > 200:
+            self.color = (0,0,0)
+        else:
+            self.color = (255,255,255)
+        self.progress = 100*self.videoCap.get(cv2.CAP_PROP_POS_FRAMES)/self.total_frame
+        self.video_timer = timedelta(seconds=0.001*self.videoCap.get(cv2.CAP_PROP_POS_MSEC))
+        self.video_timer = str(self.video_timer - timedelta(microseconds=self.video_timer.microseconds))
+
     def run(self):
         self.initWindow()
-        cap = cv2.VideoCapture(self.video_path)
-        if (cap.isOpened()== False): 
+        self.videoCap = cv2.VideoCapture(self.video_path)
+        if (self.videoCap.isOpened()== False): 
             print("Error opening video stream or file")
-        total_frame = cap.get(cv2.CAP_PROP_FRAME_COUNT)
-        self.total_time = total_frame/cap.get(cv2.CAP_PROP_FPS)
+        self.total_frame = self.videoCap.get(cv2.CAP_PROP_FRAME_COUNT)
+        self.total_time = self.total_frame/self.videoCap.get(cv2.CAP_PROP_FPS)
         self.total_time = timedelta(seconds=self.total_time)
         self.total_time = str(self.total_time - timedelta(microseconds=self.total_time.microseconds))
-        while(cap.isOpened()):
-            ret, img = cap.read()
+        while(self.videoCap.isOpened()):
+            ret, self.img = self.videoCap.read()
             if ret == True:
-                img = cv2.resize(img, (1280,720))
-                crop = img[0:100,0:100]
-                print np.mean(cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY))
-                if np.mean(cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)) > 200:
-                    self.color = (0,0,0)
-                else:
-                    self.color = (255,255,255)
-                self.progress = 100*cap.get(cv2.CAP_PROP_POS_FRAMES)/total_frame
-                self.video_timer = timedelta(seconds=0.001*cap.get(cv2.CAP_PROP_POS_MSEC))
-                self.video_timer = str(self.video_timer - timedelta(microseconds=self.video_timer.microseconds))
-                self.showMainWindow(img)
+                self.img = cv2.resize(self.img, (1280,720))
+                self.updateStatus()
+                cv2.setTrackbarPos('timeline', 'img', int(self.progress*0.01 *self.timeLineLength))
+                self.showMainWindow()
             if self.progress== 100.0:
                 print "reached end. . . "
                 k = cv2.waitKey(0) & 0xFF
                 if k == 27:
                     cv2.destroyAllWindows()
                     break
-        cap.release()
+        self.videoCap.release()
 
 
 video_path = '/home/zlin/Downloads/30 Mins Treadmill Workout Scenery. Virtual Scenery For Exercise Machine (Cotswolds UK).mp4'
